@@ -243,7 +243,7 @@ All temperatures in Celsius. Call submit_forecast now.`
         throw new Error(`API ${res.status}: ${body.slice(0,200)}`);
       }
 
-      const data = await res.json();
+      const data = await res.json(); console.log("API response:", JSON.stringify(data));
       const toolBlock = (data.content || []).find(b => b.type === "tool_use" && b.name === "submit_forecast");
       if (!toolBlock) throw new Error("No forecast returned — please try again.");
 
