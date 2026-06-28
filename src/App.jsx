@@ -115,10 +115,6 @@ function DayCard({ day, isToday, isExpanded, onToggle }) {
         <div style={{ flex: 1 }}>
           <div style={{ color: "#5a7fa8", fontSize: 9, letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>HIGH</div>
           <div style={{ color: "#e8f0ff", fontSize: 20, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{toF(day.tempMaxC)}°</div>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ color: "#5a7fa8", fontSize: 9, letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>HIGH</div>
-          <div style={{ color: "#e8f0ff", fontSize: 20, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{toF(day.tempMaxC)}°</div>
           {isToday && day.highHour && <div style={{ color: "#3a5a7a", fontSize: 9, fontFamily: "'Space Mono', monospace" }}>({day.highHour.label})</div>}
         </div>
         <div style={{ flex: 1 }}>
