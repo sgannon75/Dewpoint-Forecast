@@ -1,0 +1,388 @@
+import { useState } from "react";
+
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function toF(c) { return Math.round(c * 9/5 + 32); }
+function toFd(c) { return (c * 9/5 + 32).toFixed(1); }
+
+function heatIndex(tF, rh) {
+  if (tF < 80) return tF;
+  let hi = -42.379 + 2.04901523*tF + 10.14333127*rh
+    - 0.22475541*tF*rh - 0.00683783*tF*tF
+    - 0.05481717*rh*rh + 0.00122874*tF*tF*rh
+    + 0.00085282*tF*rh*rh - 0.00000199*tF*tF*rh*rh;
+  return Math.round(hi);
+}
+
+function RHBar({ value }) {
+  const color = value < 30 ? "#e9935a" : value < 60 ? "#5a9ee9" : "#5ae9a0";
+  return (
+    <div style={{ background: "#1a2235", borderRadius: 6, height: 6, overflow: "hidden", marginTop: 3 }}>
+      <div style={{ width: `${Math.min(value,100)}%`, background: color, height: "100%", borderRadius: 6 }} />
+    </div>
+  );
+}
+
+function discomfortLabel(dewF) {
+  if (dewF < 55) return { label: "Comfortable", color: "#5ae9a0" };
+  if (dewF < 60) return { label: "Noticeable", color: "#a8e05f" };
+  if (dewF < 65) return { label: "Sticky", color: "#fdd74b" };
+  if (dewF < 70) return { label: "Oppressive", color: "#f8954a" };
+  return { label: "Miserable", color: "#f05555" };
+}
+
+function HourlyChart({ hours }) {
+  if (!hours || hours.length === 0) return null;
+  const temps = hours.map(h => h.tempF);
+  const feels = hours.map(h => h.feelsF);
+  const dews  = hours.map(h => h.dewF);
+  const allVals = [...temps, ...feels, ...dews];
+  const minV = Math.min(...allVals) - 3;
+  const maxV = Math.max(...allVals) + 3;
+  const W = 800, H = 160, PAD = 30;
+  const xOf = i => PAD + (i / (hours.length - 1)) * (W - PAD*2);
+  const yOf = v => H - PAD - ((v - minV) / (maxV - minV)) * (H - PAD*2);
+
+  function polyline(vals, color, dash="") {
+    const pts = vals.map((v,i) => `${xOf(i)},${yOf(v)}`).join(" ");
+    return <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeDasharray={dash} />;
+  }
+
+  const labelHours = hours.filter((_, i) => i % 3 === 0);
+
+  return (
+    <div style={{ overflowX: "auto", marginTop: 12 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 320, display: "block" }}>
+        {[0.25,0.5,0.75].map(f => (
+          <line key={f} x1={PAD} x2={W-PAD} y1={PAD + f*(H-PAD*2)} y2={PAD + f*(H-PAD*2)}
+            stroke="#1a2a3a" strokeWidth="1" />
+        ))}
+        {polyline(temps, "#e8f0ff")}
+        {polyline(feels, "#f8954a")}
+        {polyline(dews,  "#7ec8e3", "4 3")}
+        {labelHours.map((h, i) => (
+          <text key={i} x={xOf(hours.indexOf(h))} y={H-6}
+            textAnchor="middle" fill="#3a5a7a" fontSize="11" fontFamily="monospace">
+            {h.label}
+          </text>
+        ))}
+        {[
+          { vals: temps, color: "#e8f0ff" },
+          { vals: feels, color: "#f8954a" },
+          { vals: dews,  color: "#7ec8e3" },
+        ].map(({ vals, color }, si) => {
+          const noonIdx = Math.floor(hours.length / 2);
+          return <circle key={si} cx={xOf(noonIdx)} cy={yOf(vals[noonIdx])} r="3" fill={color} />;
+        })}
+      </svg>
+      <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 4, flexWrap: "wrap" }}>
+        {[
+          { color: "#e8f0ff", label: "Temp", dash: false },
+          { color: "#f8954a", label: "Feels Like", dash: false },
+          { color: "#7ec8e3", label: "Dewpoint", dash: true },
+        ].map(({ color, label, dash }) => (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#5a7fa8" }}>
+            <svg width="20" height="10">
+              <line x1="0" y1="5" x2="20" y2="5" stroke={color} strokeWidth="2" strokeDasharray={dash ? "4 3" : ""} />
+            </svg>
+            {label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DayCard({ day, isToday, isExpanded, onToggle }) {
+  const date = new Date(day.date + "T12:00:00");
+  const label = isToday ? "Today" : DAYS[date.getDay()];
+  const dateStr = `${MONTHS[date.getMonth()]} ${date.getDate()}`;
+  const { label: disLabel, color: disColor } = discomfortLabel(toF(day.dewpointC));
+
+  return (
+    <div style={{
+      background: isToday ? "#0f2040" : "#111927",
+      border: isExpanded ? "1px solid #2a5298" : isToday ? "1px solid #2a5298" : "1px solid #1e2d45",
+      borderRadius: 14, padding: "18px 16px", minWidth: 0, flex: "1 1 150px",
+      cursor: "pointer", transition: "border-color 0.2s"
+    }} onClick={onToggle}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+        <div>
+          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#5a7fa8", letterSpacing: 2, textTransform: "uppercase" }}>{label}</div>
+          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#3a5a7a" }}>{dateStr}</div>
+        </div>
+        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: disColor, textAlign: "right" }}>
+          {disLabel}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "#5a7fa8", fontSize: 9, letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>HIGH</div>
+          <div style={{ color: "#e8f0ff", fontSize: 20, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{toF(day.tempMaxC)}°</div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "#5a7fa8", fontSize: 9, letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>LOW</div>
+          <div style={{ color: "#8aaace", fontSize: 20, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{toF(day.tempMinC)}°</div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "#5a7fa8", fontSize: 9, letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>FEELS</div>
+          <div style={{ color: "#f8954a", fontSize: 20, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>
+            {heatIndex(toF(day.tempMaxC), day.rh)}°
+          </div>
+        </div>
+      </div>
+      <div style={{ borderTop: "1px solid #1e2d45", paddingTop: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <span style={{ color: "#5a7fa8", fontSize: 9, letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>DEWPOINT</span>
+          <span style={{ color: "#7ec8e3", fontSize: 16, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{toF(day.dewpointC)}°F</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <span style={{ color: "#5a7fa8", fontSize: 9, letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>HUMIDITY</span>
+          <span style={{ color: day.rh < 30 ? "#e9935a" : day.rh < 60 ? "#5a9ee9" : "#5ae9a0", fontSize: 16, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{day.rh}%</span>
+        </div>
+        <RHBar value={day.rh} />
+      </div>
+      {isExpanded && day.hours && (
+        <div style={{ borderTop: "1px solid #1e2d45", marginTop: 14, paddingTop: 10 }} onClick={e => e.stopPropagation()}>
+          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: "#3a5a7a", letterSpacing: 2, marginBottom: 6 }}>HOURLY (°F)</div>
+          <HourlyChart hours={day.hours} />
+        </div>
+      )}
+      <div style={{ textAlign: "center", marginTop: 10, fontFamily: "'Space Mono', monospace", fontSize: 9, color: "#2a3a4a" }}>
+        {isExpanded ? "▲ collapse" : "▼ hourly detail"}
+      </div>
+    </div>
+  );
+}
+
+const FORECAST_TOOL = {
+  name: "submit_forecast",
+  description: "Submit a realistic 5-day weather forecast with hourly breakdown for the given location, based on typical late-June climate patterns.",
+  input_schema: {
+    type: "object",
+    properties: {
+      location: { type: "string" },
+      days: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            date:      { type: "string" },
+            tempMaxC:  { type: "number" },
+            tempMinC:  { type: "number" },
+            dewpointC: { type: "number" },
+            rh:        { type: "integer" },
+            hours: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  hour:      { type: "integer" },
+                  tempC:     { type: "number" },
+                  dewpointC: { type: "number" },
+                  rh:        { type: "integer" }
+                },
+                required: ["hour","tempC","dewpointC","rh"]
+              }
+            }
+          },
+          required: ["date","tempMaxC","tempMinC","dewpointC","rh","hours"]
+        }
+      }
+    },
+    required: ["location","days"]
+  }
+};
+
+export default function App() {
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
+  const [forecast, setForecast] = useState([]);
+  const [locationLabel, setLocationLabel] = useState(null);
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState(null);
+
+  async function handleSearch() {
+    const q = query.trim();
+    if (!q) return;
+    setStatus("loading");
+    setError("");
+    setForecast([]);
+    setLocationLabel(null);
+    setExpanded(null);
+
+    const dates = Array.from({length: 5}, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      return d.toISOString().split("T")[0];
+    });
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 4000,
+          tools: [FORECAST_TOOL],
+          tool_choice: { type: "tool", name: "submit_forecast" },
+          messages: [{
+            role: "user",
+            content: `Generate a realistic 5-day weather forecast for "${q}" for late June.
+Dates: ${dates.join(", ")}.
+For each day include 24 hourly entries (hours 0-23) with realistic diurnal variation:
+- temps lowest around 5-6am, peak around 2-4pm
+- dewpoint more stable but slightly lower midday
+- RH inverse to temperature
+All temperatures in Celsius. Call submit_forecast now.`
+          }]
+        })
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`API ${res.status}: ${body.slice(0,200)}`);
+      }
+
+      const data = await res.json();
+      const toolBlock = (data.content || []).find(b => b.type === "tool_use" && b.name === "submit_forecast");
+      if (!toolBlock) throw new Error("No forecast returned — please try again.");
+
+      const { location, days } = toolBlock.input;
+
+      const enriched = days.map(day => ({
+        ...day,
+        hours: (day.hours || []).map(h => {
+          const tF = toF(h.tempC);
+          const dF = toF(h.dewpointC);
+          const fF = heatIndex(tF, h.rh);
+          const hh = h.hour;
+          const label = hh === 0 ? "12am" : hh === 12 ? "12pm" : hh < 12 ? `${hh}am` : `${hh-12}pm`;
+          return { ...h, tempF: tF, dewF: dF, feelsF: fF, label };
+        })
+      }));
+
+      setLocationLabel(location);
+      setForecast(enriched);
+      setStatus("done");
+    } catch (e) {
+      setError(e.message || "Something went wrong.");
+      setStatus("error");
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter") handleSearch();
+  }
+
+  const glyphStyle = {
+    display: "inline-block", width: 8, height: 8,
+    borderRadius: "50%", background: "currentColor",
+    marginRight: 6, verticalAlign: "middle"
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#080f1a", color: "#c8d8f0", fontFamily: "'Space Grotesk', sans-serif", padding: "0 0 60px" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #080f1a; }
+        input::placeholder { color: #2a3a4a; }
+      `}</style>
+      <div style={{ background: "#080f1a", borderBottom: "1px solid #131f30", padding: "24px 28px 18px" }}>
+        <div style={{ maxWidth: 960, margin: "0 auto" }}>
+          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#2a5298", letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>Atmospheric</div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: "#e8f0ff", letterSpacing: -0.5, lineHeight: 1.1 }}>
+            Dewpoint &amp; Humidity<br />
+            <span style={{ color: "#2a5298" }}>5-Day Forecast</span>
+          </h1>
+          {locationLabel && (
+            <div style={{ marginTop: 8, fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#5a7fa8" }}>
+              📍 {locationLabel}
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "28px 20px" }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="City, state or zip code…"
+            style={{
+              flex: 1, background: "#0d1825", border: "1px solid #1e2d45", borderRadius: 10,
+              padding: "13px 16px", color: "#e8f0ff", fontSize: 14,
+              fontFamily: "'Space Grotesk', sans-serif", outline: "none",
+            }}
+          />
+          <button onClick={handleSearch} disabled={status === "loading"}
+            style={{
+              background: status === "loading" ? "#1a3060" : "#2a5298",
+              color: "#e8f0ff", border: "none", borderRadius: 10,
+              padding: "13px 20px", fontSize: 14, fontWeight: 700,
+              cursor: status === "loading" ? "not-allowed" : "pointer",
+              fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap"
+            }}>
+            {status === "loading" ? "Loading…" : "Get Forecast"}
+          </button>
+        </div>
+        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#2a3a4a", marginBottom: 22 }}>
+          ⚠ Seasonal climate estimates · Click a day card for hourly detail
+        </div>
+        {error && (
+          <div style={{ background: "#1a1020", border: "1px solid #4a1a2a", borderRadius: 10, padding: "12px 16px", marginBottom: 18, color: "#e07070", fontFamily: "'Space Mono', monospace", fontSize: 11 }}>
+            {error}
+          </div>
+        )}
+        {status === "idle" && (
+          <div style={{ textAlign: "center", paddingTop: 40, color: "#2a3a4a", fontFamily: "'Space Mono', monospace", fontSize: 12 }}>
+            Enter a location above to see your forecast
+          </div>
+        )}
+        {status === "loading" && (
+          <div style={{ textAlign: "center", paddingTop: 60 }}>
+            <div style={{ fontFamily: "'Space Mono', monospace", color: "#2a5298", fontSize: 13 }}>⟳  Generating forecast…</div>
+            <div style={{ fontFamily: "'Space Mono', monospace", color: "#1e2d45", fontSize: 10, marginTop: 6 }}>Generating 5 days of hourly data…</div>
+          </div>
+        )}
+        {status === "done" && forecast.length > 0 && (
+          <>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 28 }}>
+              {forecast.map((day, i) => (
+                <DayCard
+                  key={day.date} day={day} isToday={i === 0}
+                  isExpanded={expanded === i}
+                  onToggle={() => setExpanded(expanded === i ? null : i)}
+                />
+              ))}
+            </div>
+            <div style={{ background: "#0d1825", border: "1px solid #1e2d45", borderRadius: 12, padding: "14px 18px", marginBottom: 12 }}>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#3a5a7a", letterSpacing: 2, marginBottom: 10 }}>DEWPOINT DISCOMFORT SCALE</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {[
+                  { color: "#5ae9a0", range: "< 55°F", label: "Comfortable — pleasant air" },
+                  { color: "#a8e05f", range: "55–59°F", label: "Noticeable — slight mugginess" },
+                  { color: "#fdd74b", range: "60–64°F", label: "Sticky — noticeably humid" },
+                  { color: "#f8954a", range: "65–69°F", label: "Oppressive — heavy & uncomfortable" },
+                  { color: "#f05555", range: "≥ 70°F",  label: "Miserable — dangerous for exertion" },
+                ].map(({ color, range, label }) => (
+                  <div key={range} style={{ display: "flex", alignItems: "center", fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#5a7fa8" }}>
+                    <span style={{ ...glyphStyle, color }} />
+                    <span style={{ color, marginRight: 8, minWidth: 60 }}>{range}</span>
+                    <span>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ textAlign: "right", fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#1e2d45" }}>
+              Powered by Claude · {new Date().toLocaleDateString()}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
