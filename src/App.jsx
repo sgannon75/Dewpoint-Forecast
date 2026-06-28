@@ -254,9 +254,10 @@ All temperatures in Celsius. Call submit_forecast now.`
       const toolBlock = (data.content || []).find(b => b.type === "tool_use" && b.name === "submit_forecast");
       if (!toolBlock) throw new Error("No forecast returned — please try again.");
 
-      const { location, days } = toolBlock.input;
+      const { const { location, days } = toolBlock.input;
+      if (!days || !Array.isArray(days)) throw new Error("Invalid forecast data received. Please try again.");
 
-      const enriched = days.map(day => ({
+      const enriched = (days || []).map(day => ({
         ...day,
         hours: (day.hours || []).map(h => {
           const tF = toF(h.tempC);
