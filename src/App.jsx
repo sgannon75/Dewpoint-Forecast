@@ -205,7 +205,7 @@ export default function App() {
     setLocationLabel(null);
     setExpanded(null);
 
-    const dates = Array.from({length: 3}, (_, i) => {
+    const dates = Array.from({length: 5}, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() + i);
       return d.toISOString().split("T")[0];
