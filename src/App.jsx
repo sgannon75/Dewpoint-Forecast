@@ -253,7 +253,7 @@ export default function App() {
         <div style={{ maxWidth: 960, margin: "0 auto" }}>
           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: "#2a5298", letterSpacing: 3, textTransform: "uppercase", marginBottom: 4 }}>Atmospheric</div>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "#e8f0ff", letterSpacing: -0.5, lineHeight: 1.1 }}>
-            Dewpoint &amp; Humidity<br />
+            Dewpoint &amp; Humidity - SWACK Factor<br />
             <span style={{ color: "#2a5298" }}>5-Day Forecast</span>
           </h1>
           {locationLabel && (
